@@ -148,10 +148,28 @@ func ImageTar(ref *reference.Spec, prefix string, tw tarWriter, trust bool, pull
 		} else if replace[hdr.Name] != "" {
 			if hdr.Name != "etc/resolv.conf" || resolv == "" {
 				contents := replace[hdr.Name]
-				hdr.Size = int64(len(contents))
-				hdr.Name = prefix + hdr.Name
+				// new size could be greater than uint33, need to copy header without format
+				newSize := int64(len(contents))
+				newName := prefix + hdr.Name
+				newHdr := &tar.Header{
+					Typeflag:   hdr.Typeflag,
+					Name:       newName,
+					Linkname:   hdr.Linkname,
+					Size:       newSize,
+					Mode:       hdr.Mode,
+					Uid:        hdr.Uid,
+					Gid:        hdr.Gid,
+					Uname:      hdr.Uname,
+					Gname:      hdr.Gname,
+					ModTime:    hdr.ModTime,
+					AccessTime: hdr.AccessTime,
+					ChangeTime: hdr.ChangeTime,
+					Devmajor:   hdr.Devmajor,
+					Devminor:   hdr.Devminor,
+					Xattrs:     hdr.Xattrs,
+				}
 				log.Debugf("image tar: %s %s add %s", ref, prefix, hdr.Name)
-				if err := tw.WriteHeader(hdr); err != nil {
+				if err := tw.WriteHeader(newHdr); err != nil {
 					return err
 				}
 				buf := bytes.NewBufferString(contents)
@@ -176,12 +194,30 @@ func ImageTar(ref *reference.Spec, prefix string, tw tarWriter, trust bool, pull
 			}
 		} else {
 			log.Debugf("image tar: %s %s add %s", ref, prefix, hdr.Name)
-			hdr.Name = prefix + hdr.Name
+			// new filename could be greater than 256B if USTAR is used so need to copy the header without its old format
+			newName := prefix + hdr.Name
+			newHdr := &tar.Header{
+				Typeflag:   hdr.Typeflag,
+				Name:       newName,
+				Linkname:   hdr.Linkname,
+				Size:       hdr.Size,
+				Mode:       hdr.Mode,
+				Uid:        hdr.Uid,
+				Gid:        hdr.Gid,
+				Uname:      hdr.Uname,
+				Gname:      hdr.Gname,
+				ModTime:    hdr.ModTime,
+				AccessTime: hdr.AccessTime,
+				ChangeTime: hdr.ChangeTime,
+				Devmajor:   hdr.Devmajor,
+				Devminor:   hdr.Devminor,
+				Xattrs:     hdr.Xattrs,
+			}
 			if hdr.Typeflag == tar.TypeLink {
 				// hard links are referenced by full path so need to be adjusted
-				hdr.Linkname = prefix + hdr.Linkname
+				newHdr.Linkname = prefix + hdr.Linkname
 			}
-			if err := tw.WriteHeader(hdr); err != nil {
+			if err := tw.WriteHeader(newHdr); err != nil {
 				return err
 			}
 			_, err = io.Copy(tw, tr)
